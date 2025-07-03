@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Clan Members Timeline</title>
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    padding: 20px;
+    max-width: 900px;
+    margin: auto;
+  }
+  #playerSelector {
+    margin-bottom: 15px;
+  }
+  canvas {
+    max-width: 100%;
+    height: 400px;
+  }
+</style>
+</head>
+<body>
+
+<h1>Clan Members Trophies Timeline</h1>
+
+<div id="playerSelector">
+  <strong>Toggle Players:</strong><br/>
+  <!-- Checkboxes inserted here dynamically -->
+</div>
+
+<canvas id="timelineChart"></canvas>
+
+<!-- Chart.js & Zoom plugin -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@1.2.1/dist/chartjs-plugin-zoom.min.js"></script>
+
+<script>
+fetch('clan_snapshots/timeline.json')
+  .then(response => response.json())
+  .then(data => {
+    const membersObj = data.data.members;
+    const members = Object.values(membersObj);
+
+    // Prepare player selector
+    const playerSelectorDiv = document.getElementById('playerSelector');
+
+    // Prepare datasets for Chart.js
+    const datasets = members.map((member, index) => {
+      // Sort timeline data by date
+      const sortedTimeline = member.timeline.sort((a,b) => new Date(a.date) - new Date(b.date));
+      return {
+        label: member.name,
+        data: sortedTimeline.map(entry => ({
+          x: entry.date,
+          y: entry.trophies
+        })),
+        borderColor: `hsl(${index * 40 % 360}, 70%, 50%)`,
+        backgroundColor: 'transparent',
+        borderWidth: 2,
+        hidden: false,
+        fill: false,
+        tension: 0.1,
+        pointRadius: 3
+      };
+    });
+
+    // Insert checkboxes for toggling players
+    members.forEach((member, i) => {
+      const label = document.createElement('label');
+      label.style.marginRight = '15px';
+      const checkbox = document.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.checked = true;
+      checkbox.dataset.index = i;
+      checkbox.addEventListener('change', (e) => {
+        const idx = e.target.dataset.index;
+        timelineChart.data.datasets[idx].hidden = !e.target.checked;
+        timelineChart.update();
+      });
+      label.appendChild(checkbox);
+      label.appendChild(document.createTextNode(" " + member.name));
+      playerSelectorDiv.appendChild(label);
+    });
+
+    // Setup Chart.js chart
+    const ctx = document.getElementById('timelineChart').getContext('2d');
+    const timelineChart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        datasets: datasets
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        parsing: false,
+        animation: false,
+        scales: {
+          x: {
+            type: 'time',
+            time: {
+              parser: 'yyyy-MM-dd',
+              tooltipFormat: 'MMM dd, yyyy',
+              unit: 'day',
+              displayFormats: {
+                day: 'MMM dd'
+              }
+            },
+            title: {
+              display: true,
+              text: 'Date'
+            }
+          },
+          y: {
+            beginAtZero: false,
+            title: {
+              display: true,
+              text: 'Trophies'
+            }
+          }
+        },
+        plugins: {
+          legend: {
+            display: false // We'll use our own toggles
+          },
+          zoom: {
+            zoom: {
+              wheel: {
+                enabled: true,
+              },
+              pinch: {
+                enabled: true
+              },
+              mode: 'x',
+            },
+            pan: {
+              enabled: true,
+              mode: 'x',
+            }
+          },
+          tooltip: {
+            mode: 'nearest',
+            intersect: false,
+          }
+        },
+        interaction: {
+          mode: 'nearest',
+          axis: 'x',
+          intersect: false
+        }
+      },
+      plugins: [Chart.Zoom]
+    });
+  })
+  .catch(err => {
+    console.error("Failed to load JSON:", err);
+    alert("Failed to load clan_snapshots/timeline.json or invalid format.");
+  });
+</script>
+
+</body>
+</html>

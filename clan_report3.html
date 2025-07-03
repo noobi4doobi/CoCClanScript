@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Clan Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+    }
+    table {
+      border-collapse: collapse;
+      margin-top: 30px;
+      width: 100%;
+    }
+    th, td {
+      border: 1px solid #aaa;
+      padding: 8px;
+      text-align: center;
+    }
+    th {
+      background-color: #eee;
+    }
+    #chart-container {
+      width: 100%;
+      max-width: 900px;
+      margin-bottom: 50px;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Clan Members Timeline Chart</h1>
+  <div id="chart-container">
+    <canvas id="timelineChart"></canvas>
+  </div>
+
+  <h2>Current Clan Members</h2>
+  <table id="membersTable">
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Tag</th>
+        <th>Town Hall</th>
+        <th>Exp Level</th>
+        <th>Trophies</th>
+        <th>Donations</th>
+        <th>Role</th>
+        <th>Clan Rank</th>
+        <th>War Attacks</th>
+        <th>War Stars</th>
+        <th>Inactive</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+<script>
+  // Paths to your JSON files — adjust if needed
+  const REPORTS_FILE = 'clan_reports.json';
+  const TIMELINE_FILE = 'clan_snapshots/timeline.json';
+
+  async function loadJSON(path) {
+    const resp = await fetch(path);
+    if (!resp.ok) throw new Error(`Failed to load ${path}`);
+    return await resp.json();
+  }
+
+  // Prepare timeline data for Chart.js line chart
+  // We'll plot trophies over time for each member as a separate line
+  function prepareChartData(timelineData) {
+    // Get all unique dates in the timeline, sorted
+    const allDatesSet = new Set();
+    for (const memberTag in timelineData) {
+      const tl = timelineData[memberTag].timeline;
+      tl.forEach(e => allDatesSet.add(e.date));
+    }
+    const allDates = Array.from(allDatesSet).sort();
+
+    // For each member, create a dataset of trophies per date (fill missing with null)
+    const datasets = [];
+
+    Object.entries(timelineData).forEach(([tag, member]) => {
+      const dataPoints = allDates.map(date => {
+        const dayEntry = member.timeline.find(e => e.date === date);
+        return dayEntry ? dayEntry.trophies : null;
+      });
+      datasets.push({
+        label: member.name,
+        data: dataPoints,
+        fill: false,
+        borderWidth: 2,
+        spanGaps: true,  // connect points skipping nulls
+        // Random nice color for each line
+        borderColor: getRandomColor(),
+        tension: 0.2
+      });
+    });
+
+    return { labels: allDates, datasets };
+  }
+
+  // Utility to generate random colors for chart lines
+  function getRandomColor() {
+    const letters = '0123456789ABCDEF';
+    let color = '#';
+    for (let i=0; i<6; i++) {
+      color += letters[Math.floor(Math.random() * 16)];
+    }
+    return color;
+  }
+
+  // Fill members table from clan_reports.json
+  function fillMembersTable(membersData) {
+    const tbody = document.querySelector('#membersTable tbody');
+    tbody.innerHTML = '';
+
+    for (const tag in membersData) {
+      const m = membersData[tag];
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${m.name}</td>
+        <td>${m.tag}</td>
+        <td>${m.town_hall}</td>
+        <td>${m.exp_level}</td>
+        <td>${m.trophies}</td>
+        <td>${m.donations}</td>
+        <td>${m.role}</td>
+        <td>${m.clan_rank}</td>
+        <td>${m.war_attacks ?? 0}</td>
+        <td>${m.war_stars ?? 0}</td>
+        <td>${m.inactive ? 'Yes' : 'No'}</td>
+      `;
+      tbody.appendChild(tr);
+    }
+  }
+
+  async function main() {
+    try {
+      const [reportsJSON, timelineJSON] = await Promise.all([
+        loadJSON(REPORTS_FILE),
+        loadJSON(TIMELINE_FILE)
+      ]);
+
+      // Fill table with clan_reports members data
+      fillMembersTable(reportsJSON.data.members);
+
+      // Prepare chart data from timeline.json
+      const chartData = prepareChartData(timelineJSON);
+
+      // Create line chart with Chart.js
+      const ctx = document.getElementById('timelineChart').getContext('2d');
+      new Chart(ctx, {
+        type: 'line',
+        data: chartData,
+        options: {
+          responsive: true,
+          interaction: {
+            mode: 'nearest',
+            axis: 'x',
+            intersect: false,
+          },
+          plugins: {
+            title: {
+              display: true,
+              text: 'Trophies Over Time by Member'
+            },
+            tooltip: {
+              enabled: true
+            },
+            legend: {
+              position: 'bottom',
+              labels: {boxWidth: 12, padding: 10}
+            }
+          },
+          scales: {
+            x: {
+              type: 'time',
+              time: {
+                parser: 'yyyy-MM-dd',
+                tooltipFormat: 'PP',
+                unit: 'day',
+                displayFormats: {
+                  day: 'yyyy-MM-dd'
+                }
+              },
+              title: { display: true, text: 'Date' }
+            },
+            y: {
+              beginAtZero: false,
+              title: { display: true, text: 'Trophies' }
+            }
+          }
+        }
+      });
+    } catch (err) {
+      alert('Error loading data: ' + err.message);
+    }
+  }
+
+  main();
+</script>
+
+</body>
+</html>
