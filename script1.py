@@ -158,3 +158,11 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
+
+import subprocess
+
+# After your main script work:
+subprocess.run(["git", "add", "."])
+subprocess.run(["git", "commit", "-m", "Auto commit from scheduled script"])
+subprocess.run(["git", "push"])
