@@ -31,7 +31,7 @@ async def collect_war_data(client, clan):
                 war_attacks_per_player[tag] = attacks_used
                 if attacks_used < expected:
                     missed_attacks[tag] = expected - attacks_used
-    except coc.NotInWar:
+    except (coc.PrivateWarLog, coc.NotFound):
         pass
 
     try:
